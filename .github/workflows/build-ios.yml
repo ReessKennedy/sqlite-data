@@ -6,6 +6,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     # ── Runner pin ────────────────────────────────────────────────────────────
@@ -83,6 +86,8 @@ jobs:
             ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=YES \
             ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
             ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS=NO \
+            MARKETING_VERSION="1.0.${{ github.run_number }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             -skipMacroValidation \
             2>&1 | tee "$RUNNER_TEMP/${{ matrix.scheme }}-build.log"
           # Preserve xcodebuild exit code through the pipe
@@ -144,3 +149,89 @@ jobs:
           name: ${{ matrix.scheme }}-iOS
           path: ${{ runner.temp }}/${{ matrix.scheme }}-ipa/${{ matrix.scheme }}.ipa
           retention-days: 14
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ipas
+          pattern: "*-iOS"
+          merge-multiple: true
+
+      - name: Generate apps.json
+        run: |
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          VERSION="1.0.${{ github.run_number }}"
+          
+          # Compute sizes (stat syntax for Ubuntu/Linux)
+          SIZE_RE=$(stat -c%s "ipas/Reminders.ipa")
+          SIZE_SY=$(stat -c%s "ipas/SyncUps.ipa")
+          SIZE_CA=$(stat -c%s "ipas/CaseStudies.ipa")
+
+          cat <<EOF > "apps.json"
+          {
+            "name": "Reess SQLite Data Examples",
+            "identifier": "com.reesskennedy.sqlitedata.source",
+            "apps": [
+              {
+                "name": "Reminders Demo",
+                "bundleIdentifier": "co.pointfree.SQLiteData.RemindersDemo.Beta",
+                "developerName": "Reess Kennedy",
+                "version": "$VERSION",
+                "versionDate": "$DATE",
+                "versionDescription": "Automated build from GitHub Actions",
+                "downloadURL": "https://github.com/ReessKennedy/sqlite-data/releases/download/latest/Reminders.ipa",
+                "localizedDescription": "Reminders demo for SQLite Data.",
+                "tintColor": "0180FF",
+                "size": $SIZE_RE
+              },
+              {
+                "name": "SyncUps",
+                "bundleIdentifier": "co.pointfree.SQLiteData.SyncUps",
+                "developerName": "Reess Kennedy",
+                "version": "$VERSION",
+                "versionDate": "$DATE",
+                "versionDescription": "Automated build from GitHub Actions",
+                "downloadURL": "https://github.com/ReessKennedy/sqlite-data/releases/download/latest/SyncUps.ipa",
+                "localizedDescription": "SyncUps demo for SQLite Data.",
+                "tintColor": "0180FF",
+                "size": $SIZE_SY
+              },
+              {
+                "name": "CaseStudies",
+                "bundleIdentifier": "co.pointfree.CaseStudies",
+                "developerName": "Reess Kennedy",
+                "version": "$VERSION",
+                "versionDate": "$DATE",
+                "versionDescription": "Automated build from GitHub Actions",
+                "downloadURL": "https://github.com/ReessKennedy/sqlite-data/releases/download/latest/CaseStudies.ipa",
+                "localizedDescription": "CaseStudies demo for SQLite Data.",
+                "tintColor": "0180FF",
+                "size": $SIZE_CA
+              }
+            ]
+          }
+          EOF
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Update latest tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -fa latest -m "Update latest tag"
+          git push -f origin latest
+          
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest Build"
+          body: "Automated rolling release for AltStore updates. Copy the apps.json link below into AltStore Sources."
+          files: |
+            ipas/*.ipa
+            apps.json
