@@ -118,7 +118,7 @@ struct ReminderText: FTS5 {
 extension DependencyValues {
   mutating func bootstrapDatabase(syncEngineDelegate: (any SyncEngineDelegate)? = nil) throws {
     defaultDatabase = try Reminders.appDatabase()
-    defaultSyncEngine = try SyncEngine(
+    /* defaultSyncEngine = try SyncEngine(
       for: defaultDatabase,
       tables: RemindersList.self,
       RemindersListAsset.self,
@@ -126,7 +126,7 @@ extension DependencyValues {
       Tag.self,
       ReminderTag.self,
       delegate: syncEngineDelegate
-    )
+    ) */
   }
 }
 
