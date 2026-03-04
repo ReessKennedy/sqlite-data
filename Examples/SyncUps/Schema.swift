@@ -151,7 +151,6 @@ extension DependencyValues {
 
 private let logger = Logger(subsystem: "SyncUps", category: "Database")
 
-#if DEBUG
   extension DatabaseWriter {
     func seedSampleData() throws {
       try write { db in
@@ -186,4 +185,3 @@ private let logger = Logger(subsystem: "SyncUps", category: "Database")
       }
     }
   }
-#endif

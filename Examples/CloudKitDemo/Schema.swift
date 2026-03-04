@@ -48,7 +48,6 @@ extension DependencyValues {
 
 private let logger = Logger(subsystem: "CloudKitDemo", category: "Database")
 
-#if DEBUG
   extension DatabaseWriter {
     func seedSampleData() throws {
       try write { db in
@@ -59,4 +58,3 @@ private let logger = Logger(subsystem: "CloudKitDemo", category: "Database")
       }
     }
   }
-#endif

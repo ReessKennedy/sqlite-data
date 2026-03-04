@@ -406,7 +406,6 @@ nonisolated func createDefaultRemindersList() {
 
 nonisolated private let logger = Logger(subsystem: "Reminders", category: "Database")
 
-#if DEBUG
   extension DatabaseWriter {
     func seedSampleData() throws {
       @Dependency(\.date.now) var now
@@ -540,4 +539,3 @@ nonisolated private let logger = Logger(subsystem: "Reminders", category: "Datab
       }
     }
   }
-#endif
