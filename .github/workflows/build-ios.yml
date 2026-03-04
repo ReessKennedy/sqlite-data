@@ -1,0 +1,145 @@
+name: Build iOS Examples (IPA for AltStore)
+
+# Runs on every push to main, OR manually via the Actions tab on GitHub
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # ── Runner pin ────────────────────────────────────────────────────────────
+    # This project's own CI uses macos-26 / Xcode 26.2 because it was written
+    # with Swift 6.0 strict concurrency and iOS 18.x APIs.  We match that
+    # environment so we don't fight SDK mismatches the way we did with FSNotes.
+    runs-on: macos-26
+
+    strategy:
+      # Build all three example apps in parallel; a failure in one should not
+      # cancel the others so we can see which apps succeed.
+      fail-fast: false
+      matrix:
+        scheme: [Reminders, SyncUps, CaseStudies]
+
+    steps:
+      # ── 0. Show Xcode / SDK versions for diagnostics ───────────────────────
+      - name: Show Xcode and SDK versions
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          swift --version
+
+      # ── 1. Check out this fork ─────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Select the Xcode version matching the project's own CI ─────────
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
+
+      # ── 3. Resolve Swift Package dependencies ─────────────────────────────
+      #   SPM (no CocoaPods) — resolution is fast and always fresh.
+      #   Cache by Package.resolved so a lockfile change busts the cache.
+      - name: Cache Swift PM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.spm-cache
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+
+      - name: Resolve Swift Package dependencies
+        run: swift package resolve
+
+      # ── 4. Archive the iOS example app ────────────────────────────────────
+      #   Key flags inherited from FSNotes learnings:
+      #
+      #   CODE_SIGN_*=NO/""   — unsigned IPA; AltStore re-signs with your
+      #                         Apple ID when you install it on device.
+      #
+      #   ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
+      #                       — Prevents actool from emitting
+      #                         GeneratedAssetSymbols.swift into the compile
+      #                         unit. Even with GENERATE_SWIFT_ASSET_SYMBOL_
+      #                         EXTENSIONS=NO the file still appears; this
+      #                         flag is the one that suppresses it entirely.
+      #
+      #   The project already targets Swift 6.0 and iOS 18.x, so we do NOT
+      #   need SWIFT_VERSION=5 (that was FSNotes-specific to avoid strict
+      #   concurrency errors in its older dependencies).
+      - name: Archive ${{ matrix.scheme }}
+        run: |
+          xcodebuild archive \
+            -project Examples/Examples.xcodeproj \
+            -scheme "${{ matrix.scheme }}" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/${{ matrix.scheme }}.xcarchive" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=YES \
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
+            ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS=NO \
+            2>&1 | tee "$RUNNER_TEMP/${{ matrix.scheme }}-build.log"
+          # Preserve xcodebuild exit code through the pipe
+          exit ${PIPESTATUS[0]}
+
+      # ── 4b. Surface actual errors if the build failed ─────────────────────
+      #   Swift errors look like:  /path/file.swift:10:5: error: ...
+      #   grep for ": error:" (not " error: " with leading space).
+      - name: Show build errors (if any)
+        if: failure()
+        run: |
+          echo "══════════ SWIFT / CLANG ERROR LINES ══════════"
+          grep -n ": error:" "$RUNNER_TEMP/${{ matrix.scheme }}-build.log" \
+            | head -80 \
+            || echo "(no ': error:' lines found — check LAST 300 LINES below)"
+          echo ""
+          echo "══════════ LAST 300 LINES OF BUILD LOG ══════════"
+          tail -300 "$RUNNER_TEMP/${{ matrix.scheme }}-build.log"
+
+      # ── 4c. Check whether GeneratedAssetSymbols.swift was suppressed ──────
+      - name: Check GeneratedAssetSymbols.swift (if any)
+        if: failure()
+        run: |
+          GSFILE=$(find ~/Library/Developer/Xcode/DerivedData \
+            -name "GeneratedAssetSymbols.swift" 2>/dev/null | head -1)
+          if [ -n "$GSFILE" ]; then
+            echo "⚠️  Found (suppression failed): $GSFILE"
+            cat "$GSFILE"
+          else
+            echo "GeneratedAssetSymbols.swift not found — suppression is working ✓"
+          fi
+
+      # ── 4d. Upload full build log on failure ──────────────────────────────
+      - name: Upload build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.scheme }}
+          path: ${{ runner.temp }}/${{ matrix.scheme }}-build.log
+          retention-days: 7
+
+      # ── 5. Package the .app bundle into a .ipa ────────────────────────────
+      #   AltStore will re-sign this IPA with your Apple ID at install time.
+      - name: Package IPA — ${{ matrix.scheme }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/${{ matrix.scheme }}-ipa/Payload"
+          cp -r \
+            "$RUNNER_TEMP/${{ matrix.scheme }}.xcarchive/Products/Applications/${{ matrix.scheme }}.app" \
+            "$RUNNER_TEMP/${{ matrix.scheme }}-ipa/Payload/"
+          cd "$RUNNER_TEMP/${{ matrix.scheme }}-ipa"
+          zip -r "${{ matrix.scheme }}.ipa" Payload
+
+      # ── 6. Upload the .ipa as a downloadable artifact ─────────────────────
+      #   After the workflow finishes, go to Actions → your run → Artifacts
+      #   and download the scheme name. Then drag the .ipa into AltStore.
+      - name: Upload IPA artifact — ${{ matrix.scheme }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.scheme }}-iOS
+          path: ${{ runner.temp }}/${{ matrix.scheme }}-ipa/${{ matrix.scheme }}.ipa
+          retention-days: 14
