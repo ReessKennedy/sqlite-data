@@ -83,6 +83,7 @@ jobs:
             ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=YES \
             ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
             ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS=NO \
+            -skipMacroValidation \
             2>&1 | tee "$RUNNER_TEMP/${{ matrix.scheme }}-build.log"
           # Preserve xcodebuild exit code through the pipe
           exit ${PIPESTATUS[0]}
