@@ -188,6 +188,7 @@ jobs:
                 "versionDescription": "Automated build from GitHub Actions",
                 "downloadURL": "https://github.com/ReessKennedy/sqlite-data/releases/download/latest/Reminders.ipa",
                 "localizedDescription": "Reminders demo for SQLite Data.",
+                "iconURL": "https://github.com/ReessKennedy.png?size=256",
                 "tintColor": "0180FF",
                 "size": $SIZE_RE
               },
@@ -200,6 +201,7 @@ jobs:
                 "versionDescription": "Automated build from GitHub Actions",
                 "downloadURL": "https://github.com/ReessKennedy/sqlite-data/releases/download/latest/SyncUps.ipa",
                 "localizedDescription": "SyncUps demo for SQLite Data.",
+                "iconURL": "https://github.com/ReessKennedy.png?size=256",
                 "tintColor": "0180FF",
                 "size": $SIZE_SY
               },
@@ -212,6 +214,7 @@ jobs:
                 "versionDescription": "Automated build from GitHub Actions",
                 "downloadURL": "https://github.com/ReessKennedy/sqlite-data/releases/download/latest/CaseStudies.ipa",
                 "localizedDescription": "CaseStudies demo for SQLite Data.",
+                "iconURL": "https://github.com/ReessKennedy.png?size=256",
                 "tintColor": "0180FF",
                 "size": $SIZE_CA
               }
