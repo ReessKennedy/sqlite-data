@@ -39,10 +39,14 @@ extension DependencyValues {
     }
     try migrator.migrate(database)
     defaultDatabase = database
-    /* defaultSyncEngine = try SyncEngine(
-      for: defaultDatabase,
-      tables: Counter.self
-    ) */
+    defaultSyncEngine = try withDependencies {
+      $0.context = .preview
+    } operation: {
+      try SyncEngine(
+        for: defaultDatabase,
+        tables: Counter.self
+      )
+    }
   }
 }
 

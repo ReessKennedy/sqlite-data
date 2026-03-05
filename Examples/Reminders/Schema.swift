@@ -118,15 +118,19 @@ struct ReminderText: FTS5 {
 extension DependencyValues {
   mutating func bootstrapDatabase(syncEngineDelegate: (any SyncEngineDelegate)? = nil) throws {
     defaultDatabase = try Reminders.appDatabase()
-    /* defaultSyncEngine = try SyncEngine(
-      for: defaultDatabase,
-      tables: RemindersList.self,
-      RemindersListAsset.self,
-      Reminder.self,
-      Tag.self,
-      ReminderTag.self,
-      delegate: syncEngineDelegate
-    ) */
+    defaultSyncEngine = try withDependencies {
+      $0.context = .preview
+    } operation: {
+      try SyncEngine(
+        for: defaultDatabase,
+        tables: RemindersList.self,
+        RemindersListAsset.self,
+        Reminder.self,
+        Tag.self,
+        ReminderTag.self,
+        delegate: syncEngineDelegate
+      )
+    }
   }
 }
 

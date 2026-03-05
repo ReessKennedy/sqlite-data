@@ -140,12 +140,16 @@ extension DependencyValues {
     }
     try migrator.migrate(database)
     defaultDatabase = database
-    /* defaultSyncEngine = try SyncEngine(
-      for: database,
-      tables: SyncUp.self,
-      Attendee.self,
-      Meeting.self
-    ) */
+    defaultSyncEngine = try withDependencies {
+      $0.context = .preview
+    } operation: {
+      try SyncEngine(
+        for: database,
+        tables: SyncUp.self,
+        Attendee.self,
+        Meeting.self
+      )
+    }
   }
 }
 
